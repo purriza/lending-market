@@ -23,6 +23,9 @@ contract LendingMarket {
 
     uint256 internal constant FACTOR = 1e18;
 
+    /// @dev Maximum age of an oracle answer before the market refuses to price collateral.
+    uint256 internal constant MAX_PRICE_AGE = 1 hours;
+
     // -------------------------------------------------------------------------------------------
     // Storage
     // -------------------------------------------------------------------------------------------
@@ -322,8 +325,13 @@ contract LendingMarket {
     }
 
     /// @notice Collateral price in base-asset terms, 1e18 scaled.
+    /// @dev Rejects a non-positive answer and an answer older than MAX_PRICE_AGE.
     function getPrice() public view returns (uint256) {
-        (, int256 answer,,,) = oracle.latestRoundData();
+        (, int256 answer,, uint256 updatedAt,) = oracle.latestRoundData();
+
+        require(answer > 0, "bad price");
+        require(block.timestamp - updatedAt <= MAX_PRICE_AGE, "stale price");
+
         return uint256(answer);
     }
 

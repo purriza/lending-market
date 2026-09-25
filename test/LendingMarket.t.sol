@@ -203,4 +203,41 @@ contract LendingMarketTest is Test {
         assertEq(market.collateralBalance(borrower), 10e18 - seized);
         assertEq(market.borrowBalanceOf(borrower), 14_000e18);
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Finding 3: The market must reject bad and stale oracle answers
+    // ---------------------------------------------------------------------------------------
+
+    function test_negativePriceIsRejected() public {
+        _postCollateral(borrower, 10e18);
+
+        wethOracle.setPrice(-1);
+
+        vm.expectRevert("bad price");
+        market.getPrice();
+
+        vm.prank(borrower);
+        vm.expectRevert("bad price");
+        market.borrow(1e18);
+    }
+
+    function test_stalePriceIsRejected() public {
+        _postCollateral(borrower, 10e18);
+
+        vm.warp(block.timestamp + 2 hours);
+
+        vm.expectRevert("stale price");
+        market.getPrice();
+
+        vm.prank(borrower);
+        vm.expectRevert("stale price");
+        market.borrow(1e18);
+    }
+
+    function test_refreshedPriceIsAcceptedAgain() public {
+        vm.warp(block.timestamp + 2 hours);
+        wethOracle.setPrice(2_000e18);
+
+        assertEq(market.getPrice(), 2_000e18);
+    }
 }

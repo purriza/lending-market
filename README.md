@@ -70,3 +70,11 @@ See `script/Deploy.s.sol` for the current staging configuration.
 **Changed:** `seizeAmount` is now `repayAmount * liquidationIncentive / getPrice()`, which converts the incentivised repayment into collateral units. No storage change, so it ships as a plain proxy upgrade.
 
 **Tests:** `test_liquidationSeizesCollateralWorthTheIncentivisedRepayment`.
+
+### 3. The market must reject bad and stale oracle answers — Critical
+
+`getPrice` took one of the five values the oracle returns and checked none of them. The oracle reports the price as a signed number and the market turns it into an unsigned one, so a negative answer becomes a gigantic one and a borrower with almost no collateral could take the whole pool. A zero answer fails the other way round: all collateral is worth nothing and every open position becomes liquidatable at once. There was no check on `updatedAt` either, so if the feed stopped updating the market kept lending against the last price it had seen.
+
+**Changed:** `getPrice` now requires the answer to be above zero and no older than `MAX_PRICE_AGE`. I made that threshold a constant rather than a parameter the admin can update. A new variable could be appended at the end of the storage layout safely but it would read as zero on the live proxy, so every price would count as stale until someone set it and the market would have to be paused around the upgrade to avoid that. I chose to give up the governance knob for compatibility with a contract that already holds user funds. No storage change, so it ships as a plain proxy upgrade.
+
+**Tests:** `test_negativePriceIsRejected`, `test_stalePriceIsRejected` and `test_refreshedPriceIsAcceptedAgain`.
