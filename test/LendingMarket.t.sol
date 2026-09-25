@@ -173,4 +173,34 @@ contract LendingMarketTest is Test {
         assertEq(address(market.oracle()), address(newOracle));
         assertEq(market.getPrice(), 2_500e18);
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Finding 2: Liquidation must seize collateral worth the repayment plus the incentive
+    // ---------------------------------------------------------------------------------------
+
+    function test_liquidationSeizesCollateralWorthTheIncentivisedRepayment() public {
+        _postCollateral(borrower, 10e18);
+
+        vm.prank(borrower);
+        market.borrow(15_000e18);
+
+        wethOracle.setPrice(1_800e18); // borrowing power falls to 14,400
+        assertFalse(market.isHealthy(borrower));
+
+        base.mint(liquidator, 1_000e18);
+        vm.startPrank(liquidator);
+        base.approve(address(market), type(uint256).max);
+        market.liquidate(borrower, 1_000e18);
+        vm.stopPrank();
+
+        // 1,000 repaid at a 1.10 incentive is 1,100 of value, which at 1,800 per WETH is
+        // 0.6111 WETH. The original treated 1,100 as a WETH amount and took all 10 WETH.
+        uint256 seized = weth.balanceOf(liquidator);
+        assertEq(seized, 611_111_111_111_111_111);
+        // seizeAmount truncates, so revaluing it falls short by at most one wei of collateral
+        assertApproxEqAbs(seized * market.getPrice() / FACTOR, 1_100e18, market.getPrice() / FACTOR);
+
+        assertEq(market.collateralBalance(borrower), 10e18 - seized);
+        assertEq(market.borrowBalanceOf(borrower), 14_000e18);
+    }
 }

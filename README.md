@@ -55,10 +55,18 @@ See `script/Deploy.s.sol` for the current staging configuration.
 
 ## Findings
 
-### 1. Guardian must not be able to set the oracle — critical
+### 1. Guardian must not be able to set the oracle — Critical
 
 `setOracle` was gated on `onlyGuardian`. A compromised guardian key could set the price near zero and liquidate every open position. This is the boundary the Roles section above already draws: *"anything the guardian can reach should be limited to stopping the market, not changing how it prices or values anything."*
 
-**Changed:** `setOracle` is now `onlyAdmin`. No storage change, so it ships to the live proxy as a plain implementation upgrade.
+**Changed:** `setOracle` is now `onlyAdmin`. No storage change, so it ships as a plain proxy upgrade.
 
 **Tests:** `test_guardianCannotSetTheOracle` and `test_adminCanSetTheOracle`.
+
+### 2. Liquidation must seize collateral worth the incentivised repayment — Critical
+
+`seizeAmount` was `repayAmount * liquidationIncentive / FACTOR`, which is an amount of the base asset but it was subtracted from a collateral balance without ever asking the oracle for a price. Repaying 1,000 against a borrower holding 10 WETH at 1,800 took all 10 WETH, worth 18,000, instead of the 0.6111 WETH the liquidator was owed. The line that caps `seizeAmount` at the borrower's balance kept this from reverting, so the error was silent. The borrower is left with no collateral and an open debt that no liquidator has any reason to clear and that loss stays with the suppliers.
+
+**Changed:** `seizeAmount` is now `repayAmount * liquidationIncentive / getPrice()`, which converts the incentivised repayment into collateral units. No storage change, so it ships as a plain proxy upgrade.
+
+**Tests:** `test_liquidationSeizesCollateralWorthTheIncentivisedRepayment`.
