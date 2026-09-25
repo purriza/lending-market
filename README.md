@@ -78,3 +78,11 @@ See `script/Deploy.s.sol` for the current staging configuration.
 **Changed:** `getPrice` now requires the answer to be above zero and no older than `MAX_PRICE_AGE`. I made that threshold a constant rather than a parameter the admin can update. A new variable could be appended at the end of the storage layout safely but it would read as zero on the live proxy, so every price would count as stale until someone set it and the market would have to be paused around the upgrade to avoid that. I chose to give up the governance knob for compatibility with a contract that already holds user funds. No storage change, so it ships as a plain proxy upgrade.
 
 **Tests:** `test_negativePriceIsRejected`, `test_stalePriceIsRejected` and `test_refreshedPriceIsAcceptedAgain`.
+
+## Scope note
+
+**Priorities.** I fixed the three defects that can drain the market outright and left unfixed the missing `accrueInterest()` in `withdrawCollateral` (leaks only the interest not yet accrued), the absent close factor in `liquidate` (overcharges the borrower rather than the protocol) and the unprotected `initialize` on the implementation (harmless behind a transparent proxy).
+
+**Unsure.** `MAX_PRICE_AGE` is one hour because that is the usual Chainlink heartbeat and no test reaches the branch that caps `seizeAmount` at the borrower's balance.
+
+**AI tooling.** Used throughout, mostly for tests and wording, with every figure re-derived by hand before I accepted it. I rejected a suggestion for the staleness fix, a governable `maxPriceAge` storage variable, because a new slot reads as zero on a live proxy and would freeze pricing the moment the upgrade landed. Although it would be better from a governance point of view.
