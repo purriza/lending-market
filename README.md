@@ -52,3 +52,13 @@ The split matters. The guardian key is warmer and held by more people than the a
 ## Listed markets
 
 See `script/Deploy.s.sol` for the current staging configuration.
+
+## Findings
+
+### 1. Guardian must not be able to set the oracle — critical
+
+`setOracle` was gated on `onlyGuardian`. A compromised guardian key could set the price near zero and liquidate every open position. This is the boundary the Roles section above already draws: *"anything the guardian can reach should be limited to stopping the market, not changing how it prices or values anything."*
+
+**Changed:** `setOracle` is now `onlyAdmin`. No storage change, so it ships to the live proxy as a plain implementation upgrade.
+
+**Tests:** `test_guardianCannotSetTheOracle` and `test_adminCanSetTheOracle`.

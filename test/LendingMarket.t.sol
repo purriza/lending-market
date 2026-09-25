@@ -148,4 +148,29 @@ contract LendingMarketTest is Test {
 
         assertTrue(market.paused());
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Finding 1: Guardian must not be able to set the oracle
+    // ---------------------------------------------------------------------------------------
+
+    function test_guardianCannotSetTheOracle() public {
+        MockOracle newOracle = new MockOracle(2_500e18);
+
+        vm.prank(guardian);
+        vm.expectRevert("not admin");
+        market.setOracle(address(newOracle));
+
+        assertEq(address(market.oracle()), address(wethOracle));
+        assertEq(market.getPrice(), 2_000e18);
+    }
+
+    function test_adminCanSetTheOracle() public {
+        MockOracle newOracle = new MockOracle(2_500e18);
+
+        vm.prank(admin);
+        market.setOracle(address(newOracle));
+
+        assertEq(address(market.oracle()), address(newOracle));
+        assertEq(market.getPrice(), 2_500e18);
+    }
 }
